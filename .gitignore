@@ -1,0 +1,7 @@
+.venv
+*.parquet
+*.csv
+*.pkl
+*.xls
+.ipynb_checkpoints/
+development

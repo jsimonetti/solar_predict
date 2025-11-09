@@ -54,7 +54,6 @@ weather_conditions = {
     'temperature': 25.0,      # °C
     'precipitation': 0.0,     # mm
     'irradiance': 300.0,      # J/cm²/h
-    'wind_speed': 5.0,        # m/s
     'day_of_week': 1,         # 0=Monday, 6=Sunday
     'hour': 12,               # 0-23
     'quarter': 2,             # 1-4
@@ -78,7 +77,6 @@ Your weather data should contain these columns:
 | `temperature` | Air temperature | °C | 25.3 |
 | `precipitation` | Precipitation amount | mm | 0.0 |
 | `irradiance` | Solar irradiance | J/cm²/h | 280.5 |
-| `wind_speed` | Wind speed | m/s | 4.2 |
 
 ### Solar Data
 

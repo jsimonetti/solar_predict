@@ -81,9 +81,8 @@ def create_features(df):
 
     This function generates time-based and weather-related features from
     the input DataFrame, which is assumed to have a DatetimeIndex and
-    columns for 'temperature', 'irradiance', and 'wind_speed'. It also
-    computes derived performance metrics for solar and wind energy, and
-    heating/cooling degree days.
+    columns for 'temperature' and 'irradiance'. It also computes derived
+    performance metrics for solar energy.
 
     Parameters
     ----------
@@ -91,7 +90,6 @@ def create_features(df):
         Input DataFrame with at least the following columns:
         - 'temperature' : float, ambient temperature in °C
         - 'irradiance' : float, solar irradiance in J/cm²/h
-        - 'wind_speed' : float, wind speed in m/s
         The DataFrame index must be a pandas.DatetimeIndex.
 
     Returns
@@ -139,7 +137,7 @@ class SolarPredictor:
         self.random_state = random_state
         self.model = None
         self.feature_columns = [
-            'temperature', 'precipitation', 'irradiance', 'wind_speed',
+            'temperature', 'precipitation', 'irradiance',
             'day_of_week', 'hour', 'quarter', 'month', 'season', 'solar_performance'
         ]
         self.is_trained = False
@@ -170,7 +168,7 @@ class SolarPredictor:
             raise ValueError("Weather data must have a 'datetime' column or DatetimeIndex")
             
         # Validate required columns
-        required_cols = ['temperature', 'precipitation', 'irradiance', 'wind_speed']
+        required_cols = ['temperature', 'precipitation', 'irradiance']
         missing_cols = [col for col in required_cols if col not in weather_df.columns]
         if missing_cols:
             raise ValueError(f"Weather data missing required columns: {missing_cols}")
@@ -307,7 +305,7 @@ class SolarPredictor:
         
         Args:
             weather_data: Path to weather CSV or DataFrame with columns:
-                         ['datetime', 'temperature', 'precipitation', 'irradiance', 'wind_speed']
+                         ['datetime', 'temperature', 'precipitation', 'irradiance']
             solar_data: Path to solar CSV or DataFrame with columns:
                        ['datetime', 'solar_kwh']
             model_save_path: Path where to save the trained model
@@ -452,7 +450,7 @@ class SolarPredictor:
         
         Args:
             weather_data: Either a dictionary with single prediction data or DataFrame with multiple predictions
-                        Required keys/columns: temperature, precipitation, irradiance, wind_speed,
+                        Required keys/columns: temperature, precipitation, irradiance,
                                              day_of_week, hour, quarter, month, season
         
         Returns:
@@ -471,7 +469,6 @@ class SolarPredictor:
                 weather_data['temperature'],
                 weather_data['precipitation'], 
                 weather_data['irradiance'],
-                weather_data['wind_speed'],
                 weather_data['day_of_week'],
                 weather_data['hour'],
                 weather_data['quarter'],
@@ -488,9 +485,8 @@ class SolarPredictor:
             if not isinstance(weather_data, pd.DataFrame):
                 raise ValueError("weather_data must be a dictionary or pandas DataFrame")
             
-            # Create features if not present
-            if 'solar_performance' not in weather_data.columns:
-                weather_data = create_features(weather_data)
+            # Process weather data using the standard method
+            weather_data = self._load_and_process_weather_data(weather_data)
             
             # Select required features
             X = weather_data[self.feature_columns]

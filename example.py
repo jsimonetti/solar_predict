@@ -132,7 +132,6 @@ def example_3_single_predictions():
         'temperature': 25.0,      # 25°C
         'precipitation': 0.0,     # No rain
         'irradiance': 300.0,      # High solar irradiance (J/cm²/h)
-        'wind_speed': 5.0,        # Moderate wind (m/s)
         'day_of_week': 1,         # Tuesday (0=Monday, 6=Sunday)
         'hour': 12,               # Noon
         'quarter': 2,             # Q2 (April-June)
@@ -148,7 +147,6 @@ def example_3_single_predictions():
         'temperature': 5.0,       # 5°C
         'precipitation': 2.0,     # Light rain
         'irradiance': 50.0,       # Low irradiance
-        'wind_speed': 12.0,       # Strong wind
         'day_of_week': 4,         # Friday
         'hour': 9,                # 9 AM
         'quarter': 1,             # Q1 (Jan-Mar)
@@ -164,7 +162,6 @@ def example_3_single_predictions():
         'temperature': 15.0,
         'precipitation': 0.0,
         'irradiance': 0.0,        # No sun in evening
-        'wind_speed': 3.0,
         'day_of_week': 2,
         'hour': 20,               # 8 PM
         'quarter': 3,
@@ -252,7 +249,6 @@ def example_5_load_and_predict():
             'temperature': 20.0,
             'precipitation': 0.0,
             'irradiance': 250.0,
-            'wind_speed': 8.0,
             'day_of_week': 2,  # Wednesday
             'hour': 14,        # 2 PM
             'quarter': 2,
@@ -345,8 +341,7 @@ def create_sample_weather_data():
             'datetime': dt,
             'temperature': temperature,
             'precipitation': max(0, np.random.exponential(0.5)),
-            'irradiance': irradiance,
-            'wind_speed': max(0, np.random.normal(8, 3))
+            'irradiance': irradiance
         })
     
     df = pd.DataFrame(data)
@@ -394,7 +389,6 @@ def create_prediction_sample_data():
             'temperature': 15 + 5 * np.sin((dt.hour - 6) * np.pi / 12) + np.random.normal(0, 1),
             'precipitation': max(0, np.random.exponential(0.3)),
             'irradiance': max(0, 300 * np.sin(max(0, dt.hour - 6) * np.pi / 12)) if 6 <= dt.hour <= 18 else 0,
-            'wind_speed': max(0, np.random.normal(7, 2)),
             'day_of_week': dt.dayofweek,
             'hour': dt.hour,
             'quarter': (dt.month - 1) // 3 + 1,
