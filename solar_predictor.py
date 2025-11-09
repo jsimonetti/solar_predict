@@ -450,8 +450,8 @@ class SolarPredictor:
         
         Args:
             weather_data: Either a dictionary with single prediction data or DataFrame with multiple predictions
-                        Required keys/columns: temperature, precipitation, irradiance,
-                                             day_of_week, hour, quarter, month, season
+                        For single prediction (dict), required keys: temperature, precipitation, irradiance, datetime
+                        For batch prediction (DataFrame), required columns: temperature, precipitation, irradiance, datetime
         
         Returns:
             Predicted solar production in kWh
@@ -460,23 +460,20 @@ class SolarPredictor:
             raise ValueError("Model must be trained before making predictions. Call train() first.")
         
         if isinstance(weather_data, dict):
-            # Single prediction
-            # Calculate solar performance metric
-            solar_perf = solar_performance_metric(weather_data['irradiance'], weather_data['temperature'])
+            # Single prediction - convert to DataFrame and process
+            if 'datetime' not in weather_data:
+                raise ValueError("Single prediction requires 'datetime' key")
             
-            # Create feature array
-            features = np.array([[
-                weather_data['temperature'],
-                weather_data['precipitation'], 
-                weather_data['irradiance'],
-                weather_data['day_of_week'],
-                weather_data['hour'],
-                weather_data['quarter'],
-                weather_data['month'],
-                weather_data['season'],
-                solar_perf
-            ]])
+            # Create single-row DataFrame
+            single_df = pd.DataFrame([weather_data])
+            single_df['datetime'] = pd.to_datetime(single_df['datetime'])
+            single_df = single_df.set_index('datetime')
             
+            # Process through feature engineering
+            processed_df = create_features(single_df)
+            
+            # Extract features and make prediction
+            features = processed_df[self.feature_columns].iloc[0:1]
             prediction = self.model.predict(features)[0]
             return max(0, prediction)  # Ensure non-negative
         

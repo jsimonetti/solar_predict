@@ -132,11 +132,7 @@ def example_3_single_predictions():
         'temperature': 25.0,      # 25°C
         'precipitation': 0.0,     # No rain
         'irradiance': 300.0,      # High solar irradiance (J/cm²/h)
-        'day_of_week': 1,         # Tuesday (0=Monday, 6=Sunday)
-        'hour': 12,               # Noon
-        'quarter': 2,             # Q2 (April-June)
-        'month': 6,               # June
-        'season': 2               # Summer (0=winter, 1=spring, 2=summer, 3=autumn)
+        'datetime': '2023-06-15 12:00:00'  # June 15th at noon
     }
     
     prediction = predictor.predict(sunny_summer_noon)
@@ -147,11 +143,7 @@ def example_3_single_predictions():
         'temperature': 5.0,       # 5°C
         'precipitation': 2.0,     # Light rain
         'irradiance': 50.0,       # Low irradiance
-        'day_of_week': 4,         # Friday
-        'hour': 9,                # 9 AM
-        'quarter': 1,             # Q1 (Jan-Mar)
-        'month': 1,               # January
-        'season': 0               # Winter
+        'datetime': '2023-01-15 09:00:00'  # January 15th at 9 AM
     }
     
     prediction = predictor.predict(cloudy_winter_morning)
@@ -162,11 +154,7 @@ def example_3_single_predictions():
         'temperature': 15.0,
         'precipitation': 0.0,
         'irradiance': 0.0,        # No sun in evening
-        'day_of_week': 2,
-        'hour': 20,               # 8 PM
-        'quarter': 3,
-        'month': 9,
-        'season': 3
+        'datetime': '2023-09-15 20:00:00'  # September 15th at 8 PM
     }
     
     prediction = predictor.predict(evening)
@@ -249,11 +237,7 @@ def example_5_load_and_predict():
             'temperature': 20.0,
             'precipitation': 0.0,
             'irradiance': 250.0,
-            'day_of_week': 2,  # Wednesday
-            'hour': 14,        # 2 PM
-            'quarter': 2,
-            'month': 5,        # May
-            'season': 1        # Spring
+            'datetime': '2023-05-15 14:00:00'  # May 15th at 2 PM
         }
         
         prediction = predictor.predict(current_conditions)

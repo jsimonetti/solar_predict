@@ -49,16 +49,12 @@ print(f"Model R² Score: {training_stats['test_r2']:.3f}")
 # Load trained model
 predictor = SolarPredictor.load_model("./my_solar_model.pkl")
 
-# Single prediction
+# Single prediction (time features auto-generated from datetime)
 weather_conditions = {
     'temperature': 25.0,      # °C
     'precipitation': 0.0,     # mm
     'irradiance': 300.0,      # J/cm²/h
-    'day_of_week': 1,         # 0=Monday, 6=Sunday
-    'hour': 12,               # 0-23
-    'quarter': 2,             # 1-4
-    'month': 6,               # 1-12
-    'season': 2               # 0=winter, 1=spring, 2=summer, 3=autumn
+    'datetime': '2023-06-15 12:00:00'  # Datetime for feature generation
 }
 
 prediction = predictor.predict(weather_conditions)
@@ -122,7 +118,8 @@ SolarPredictor(random_state=42)
 
 **`predict(weather_data)`**
 - Makes predictions on new data
-- Supports single prediction (dict) or batch (DataFrame)
+- For single prediction: dict with temperature, precipitation, irradiance, datetime
+- For batch prediction: DataFrame with datetime column (time features auto-generated)
 - Returns predicted kWh values
 
 **`load_model(model_path)`** (class method)
