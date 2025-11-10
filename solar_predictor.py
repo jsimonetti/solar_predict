@@ -127,12 +127,17 @@ class SolarPredictor:
     model training, and prediction for hourly solar production forecasting.
     """
     
-    def __init__(self, random_state: int = 42):
+    def __init__(self, random_state: int = 42, max_hourly_production: Optional[Dict[int, float]] = None):
         """
         Initialize the SolarPredictor.
         
         Args:
             random_state: Random state for reproducible results
+            max_hourly_production: Optional dictionary mapping hour (0-23) to maximum 
+                                 expected kWh production for physics-based outlier detection.
+                                 If None, uses physics-based constraints for a typical 5kW system at 52°N.
+                                 For better accuracy, use create_physics_based_constraints() 
+                                 with your actual system capacity and location.
         """
         self.random_state = random_state
         self.model = None
@@ -143,6 +148,101 @@ class SolarPredictor:
         self.is_trained = False
         self.training_stats = {}
         
+        # Set default physics-based constraints for typical residential system
+        # Uses 5kW system at 45°N latitude (mid-latitude) as reasonable default
+        self.max_hourly_production = max_hourly_production or self.create_physics_based_constraints(
+            system_capacity_kw=5.0,
+            latitude=52.0,
+            system_efficiency=0.8,
+            conservative_factor=1.2
+        )
+        
+    
+    @classmethod
+    def create_physics_based_constraints(cls, system_capacity_kw: float, 
+                                       latitude: float = 52.0,
+                                       system_efficiency: float = 0.8,
+                                       conservative_factor: float = 1.2) -> Dict[int, float]:
+        """
+        Create physics-based maximum hourly production constraints based on solar system capacity.
+        
+        This calculates theoretical maximum production for each hour based on:
+        - System peak capacity (kWp)
+        - Solar elevation angles throughout the day
+        - System efficiency (inverter losses, temperature derating, etc.)
+        - Conservative safety factor for outlier detection
+        
+        Args:
+            system_capacity_kw: Solar system peak capacity in kW (e.g., 6.5 for 6.5kWp system)
+            latitude: Installation latitude in degrees (affects sun angles)
+                     Examples: 52.0 (Netherlands), 40.7 (New York), 34.0 (Los Angeles)
+            system_efficiency: Overall system efficiency (0.0-1.0)
+                              Typical: 0.75-0.85 (accounts for inverter losses, temperature, dust, etc.)
+            conservative_factor: Safety multiplier for outlier detection (>1.0)
+                               Higher = more lenient outlier detection
+                               1.2 = 20% above theoretical maximum
+        
+        Returns:
+            Dictionary mapping hour (0-23) to maximum expected production (kWh)
+            
+        Example:
+            # For a 8kWp system in Netherlands (52°N latitude)
+            constraints = SolarPredictor.create_physics_based_constraints(
+                system_capacity_kw=8.0,
+                latitude=52.0,
+                system_efficiency=0.8,
+                conservative_factor=1.2
+            )
+            predictor = SolarPredictor(max_hourly_production=constraints)
+        """
+        import math
+        
+        # Solar declination angle (simplified for summer solstice - maximum sun elevation)
+        # This gives us the most conservative (highest possible) estimates
+        declination = 23.45  # degrees, summer solstice
+        
+        constraints = {}
+        
+        for hour in range(24):
+            # Solar hour angle (0 = solar noon, ±15° per hour)
+            hour_angle = 15.0 * (hour - 12)
+            
+            # Calculate solar elevation angle
+            lat_rad = math.radians(latitude)
+            dec_rad = math.radians(declination)
+            hour_rad = math.radians(hour_angle)
+            
+            elevation_rad = math.asin(
+                math.sin(lat_rad) * math.sin(dec_rad) + 
+                math.cos(lat_rad) * math.cos(dec_rad) * math.cos(hour_rad)
+            )
+            elevation_deg = math.degrees(elevation_rad)
+            
+            if elevation_deg <= 0:
+                # Sun is below horizon
+                max_production = 0.05  # Small threshold for measurement noise
+            else:
+                # Calculate relative irradiance based on sun elevation
+                # At 90° (zenith), max irradiance ≈ 1000 W/m²
+                # Use sine function to approximate atmospheric losses at low angles
+                relative_irradiance = math.sin(elevation_rad)
+                
+                # Apply additional atmospheric losses for low sun angles
+                if elevation_deg < 15:
+                    # Significant atmospheric losses near horizon
+                    relative_irradiance *= (elevation_deg / 15.0) ** 0.5
+                
+                # Calculate theoretical maximum production for this hour
+                # Max kWh = System_kW × Relative_Irradiance × Efficiency × 1_hour
+                theoretical_max = system_capacity_kw * relative_irradiance * system_efficiency
+                
+                # Apply conservative factor for outlier detection
+                max_production = theoretical_max * conservative_factor
+            
+            constraints[hour] = max(0.05, max_production)  # Minimum threshold for noise
+        
+        return constraints
+    
     def _load_and_process_weather_data(self, weather_data: Union[str, pd.DataFrame]) -> pd.DataFrame:
         """
         Load and process weather data.
@@ -217,6 +317,18 @@ class SolarPredictor:
         """
         Comprehensive outlier detection for solar production data.
         
+        Uses a three-method approach to identify and remove outliers:
+        
+        1. **Statistical outliers**: Z-score > 3 (values more than 3 standard deviations from mean)
+        2. **IQR outliers**: Values outside Q1 - 1.5*IQR or Q3 + 1.5*IQR range
+        3. **Physics-based outliers**: Values exceeding theoretical maximum production by hour
+        
+        A data point is flagged as an outlier only if detected by 2+ methods,
+        reducing false positives while catching genuine anomalies.
+        
+        Additionally applies seasonal context outlier detection based on the
+        correlation between solar production and irradiance within season-hour groups.
+        
         Args:
             merged_data: Merged weather and solar data
             
@@ -246,14 +358,24 @@ class SolarPredictor:
             IQR = Q3 - Q1
             iqr_outliers = (solar_values < (Q1 - 1.5 * IQR)) | (solar_values > (Q3 + 1.5 * IQR))
             
-            # Physics-based constraints
-            max_expected = {
-                **{h: 0.1 for h in [20, 21, 22, 23, 0, 1, 2, 3, 4, 5]},
-                6: 0.5, 7: 1.5, 8: 2.5, 9: 3.5,
-                10: 4.5, 11: 5.0, 12: 5.5, 13: 5.5, 14: 5.0,
-                15: 4.0, 16: 3.0, 17: 2.0, 18: 1.0, 19: 0.5
-            }
-            physics_outliers = solar_values > max_expected.get(hour, 5.5)
+            # Physics-based constraints: Maximum reasonable solar production by hour
+            # These values represent theoretical upper bounds for a typical residential
+            # solar installation (4-6kW system) under ideal conditions.
+            # 
+            # Logic:
+            # - Night hours (20-05): Virtually no production (0.1 kWh max for measurement noise)
+            # - Dawn/Dusk (6, 19): Low production as sun is at low angles
+            # - Morning ramp (7-9): Increasing production as sun rises
+            # - Peak hours (10-14): Maximum production when sun is highest
+            # - Afternoon decline (15-18): Decreasing as sun sets
+            #
+            # Note: These are conservative estimates and may need adjustment for:
+            # - Larger installations (scale proportionally)
+            # - Different latitudes (seasonal variation)
+            # - Local climate conditions
+            
+            # Use configurable physics-based constraints
+            physics_outliers = solar_values > self.max_hourly_production.get(hour, 5.5)
             
             # Combine methods (outlier if flagged by 2+ methods)
             combined_outliers = (statistical_outliers.astype(int) + 

@@ -106,8 +106,12 @@ This single file demonstrates:
 
 #### Constructor
 ```python
-SolarPredictor(random_state=42)
+SolarPredictor(random_state=42, max_hourly_production=None)
 ```
+
+**Parameters:**
+- `random_state`: Random seed for reproducible results
+- `max_hourly_production`: Optional dict mapping hour (0-23) to max expected kWh for outlier detection
 
 #### Methods
 
@@ -125,6 +129,12 @@ SolarPredictor(random_state=42)
 **`load_model(model_path)`** (class method)
 - Loads a previously trained model
 - Returns SolarPredictor instance
+
+**`create_physics_based_constraints(system_capacity_kw, latitude, system_efficiency, conservative_factor)`** (class method)
+- **RECOMMENDED**: Creates accurate physics-based constraints using solar angles
+- Accounts for system capacity, location latitude, and efficiency losses
+- Returns dict suitable for max_hourly_production parameter
+- Example: `SolarPredictor.create_physics_based_constraints(8.5, 52.0, 0.8, 1.2)`
 
 **`get_feature_importance()`**
 - Returns feature importance scores
@@ -145,6 +155,43 @@ The module includes comprehensive outlier detection and achieves typical perform
 - **Mean Absolute Error**: 0.2-0.4 kWh/hour
 - **R² Score**: 0.75-0.85
 - **Feature Importance**: Irradiance and solar_performance are typically most important
+
+## Outlier Detection & Physics-Based Constraints
+
+The module uses a three-method approach for outlier detection:
+
+1. **Statistical outliers**: Z-score > 3 (extreme deviations from mean)
+2. **IQR outliers**: Values outside Q1 ± 1.5×IQR range  
+3. **Physics-based outliers**: Values exceeding realistic hourly production limits
+
+### Customizing Physics-Based Constraints
+
+By default, constraints are set for a typical 4-6kW residential system. You can customize them:
+
+```python
+# RECOMMENDED: Physics-based constraints (accurate, location-aware)
+constraints = SolarPredictor.create_physics_based_constraints(
+    system_capacity_kw=8.5,    # Your system's peak capacity
+    latitude=52.0,             # Your location latitude  
+    system_efficiency=0.8,     # Account for inverter losses, temperature, etc.
+    conservative_factor=1.2    # 20% safety margin for outlier detection
+)
+predictor = SolarPredictor(max_hourly_production=constraints)
+
+# Alternative: Simple scaling (less accurate, deprecated)
+constraints = SolarPredictor.create_scaled_constraints(8.5)
+predictor = SolarPredictor(max_hourly_production=constraints)
+
+# Or provide completely custom constraints
+custom_constraints = {
+    0: 0.1,   # Midnight: minimal production
+    6: 0.3,   # Dawn: low production  
+    12: 8.0,  # Solar noon: peak production
+    18: 0.5,  # Sunset: minimal production
+    # ... define for all 24 hours
+}
+predictor = SolarPredictor(max_hourly_production=custom_constraints)
+```
 
 ## File Structure
 
