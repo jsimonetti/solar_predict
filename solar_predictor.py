@@ -21,59 +21,6 @@ from scipy import stats
 
 warnings.filterwarnings('ignore')
 
-def solar_performance_metric(rad, ambient, gamma=-0.0035, NOCT=45.0):
-    """
-    Compute an effective solar performance metric that accounts for irradiance,
-    module temperature, and efficiency losses.
-
-    This metric represents an adjusted irradiance value (in W/m²-equivalent)
-    that approximates the combined effects of irradiance level, temperature,
-    and cell performance characteristics. It is useful for estimating
-    photovoltaic (PV) performance under non-standard test conditions.
-
-    Parameters
-    ----------
-    rad : float or array_like
-        Solar irradiance in joules per square centimeter per hour (J/cm²/h).
-        Typical range: 0–3600 J/cm²/h (equivalent to 0–1000 W/m²).
-    ambient : float or array_like
-        Ambient temperature in degrees Celsius (°C).
-    gamma : float, optional
-        Temperature coefficient of power (per °C). Defaults to -0.0035.
-        Negative values indicate power decreases with increasing temperature.
-    NOCT : float, optional
-        Nominal Operating Cell Temperature in degrees Celsius (°C).
-        Defaults to 45.0. Used in estimating cell temperature rise under
-        irradiance.
-
-    Returns
-    -------
-    metric : float or ndarray
-        Effective solar performance metric (0–1000 range), representing
-        adjusted irradiance in W/m²-equivalent after accounting for
-        temperature and irradiance nonlinearity.
-
-    References
-    ----------
-    - IEC 61853-1: Photovoltaic (PV) module performance testing and energy rating
-    - Duffie, J.A., & Beckman, W.A. (2013). *Solar Engineering of Thermal Processes*.
-
-    """
-    conv = 10000.0 / 3600.0  # J/cm²/h -> W/m²
-    R = rad * conv      # W/m²
-
-    T = ambient + (NOCT - 20.0) / 800.0 * R
-    a = 1.0 - 0.2 * np.exp(-R / 200.0)
-    irradiance_factor = (R / 1000.0) ** a
-
-    temp_factor = 1.0 + gamma * (T - 25.0)
-    temp_factor = np.maximum(temp_factor, 0.0)  # element-wise
-
-    metric = 1000.0 * irradiance_factor * temp_factor
-    metric = np.clip(metric, 0.0, 1000.0)       # element-wise clip
-
-    return metric
-
 
 def create_features(df):
     """
@@ -101,7 +48,6 @@ def create_features(df):
         - 'quarter' : int, quarter of the year (1–4)
         - 'month' : int, month of the year (1–12)
         - 'season' : int, mapped season (0=winter, 1=spring, 2=summer, 3=autumn)
-        - 'solar_performance' : float, estimated solar performance metric
     """
     df = df.copy()
     df['day_of_week'] = df.index.dayofweek
@@ -114,7 +60,6 @@ def create_features(df):
         6: 2, 7: 2, 8: 2,     # summer
         9: 3, 10: 3, 11: 3    # autumn
     })
-    df['solar_performance'] = solar_performance_metric(df['irradiance'], df['temperature']).astype(float)
     return df
 
 
@@ -143,7 +88,7 @@ class SolarPredictor:
         self.model = None
         self.feature_columns = [
             'temperature', 'precipitation', 'irradiance',
-            'day_of_week', 'hour', 'quarter', 'month', 'season', 'solar_performance'
+            'day_of_week', 'hour', 'quarter', 'month', 'season'
         ]
         self.is_trained = False
         self.training_stats = {}
@@ -400,12 +345,13 @@ class SolarPredictor:
                     irradiance_corr = season_hour_data['solar_kwh'].corr(season_hour_data['irradiance'])
                     
                     if irradiance_corr > 0.5:
-                        performance_ratio = season_hour_data['solar_kwh'] / (season_hour_data['solar_performance'] + 1e-6)
-                        Q1 = performance_ratio.quantile(0.25)
-                        Q3 = performance_ratio.quantile(0.75)
+                        # Use direct irradiance vs solar production ratio for outlier detection
+                        irradiance_ratio = season_hour_data['solar_kwh'] / (season_hour_data['irradiance'] + 1e-6)
+                        Q1 = irradiance_ratio.quantile(0.25)
+                        Q3 = irradiance_ratio.quantile(0.75)
                         IQR = Q3 - Q1
                         
-                        ratio_outliers = (performance_ratio < (Q1 - 2.0 * IQR)) | (performance_ratio > (Q3 + 2.0 * IQR))
+                        ratio_outliers = (irradiance_ratio < (Q1 - 2.0 * IQR)) | (irradiance_ratio > (Q3 + 2.0 * IQR))
                         seasonal_outlier_mask.loc[season_hour_data.index] = ratio_outliers
         
         # Apply outlier removal

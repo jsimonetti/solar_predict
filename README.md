@@ -6,7 +6,7 @@ A comprehensive Python module for predicting hourly solar production using XGBoo
 
 - 🤖 **XGBoost-based predictions** with automatic hyperparameter tuning
 - 🧹 **Smart outlier detection** using context-aware methods
-- 🌡️ **Weather feature engineering** including solar performance metrics
+- 🌡️ **Weather feature engineering** including temporal and seasonal features
 - 📊 **Comprehensive evaluation** with multiple metrics
 - 💾 **Model persistence** for easy deployment and reuse
 - 📈 **Batch and single predictions** support
@@ -154,7 +154,7 @@ The module includes comprehensive outlier detection and achieves typical perform
 
 - **Mean Absolute Error**: 0.2-0.4 kWh/hour
 - **R² Score**: 0.75-0.85
-- **Feature Importance**: Irradiance and solar_performance are typically most important
+- **Feature Importance**: Irradiance and hour are typically most important
 
 ## Outlier Detection & Physics-Based Constraints
 
@@ -176,10 +176,6 @@ constraints = SolarPredictor.create_physics_based_constraints(
     system_efficiency=0.8,     # Account for inverter losses, temperature, etc.
     conservative_factor=1.2    # 20% safety margin for outlier detection
 )
-predictor = SolarPredictor(max_hourly_production=constraints)
-
-# Alternative: Simple scaling (less accurate, deprecated)
-constraints = SolarPredictor.create_scaled_constraints(8.5)
 predictor = SolarPredictor(max_hourly_production=constraints)
 
 # Or provide completely custom constraints
@@ -223,7 +219,7 @@ Outliers are typically 1-3% of the dataset and significantly improve model perfo
 1. **Data Quality**: Ensure your weather and solar data are synchronized and complete
 2. **Regular Retraining**: Update the model with new data periodically
 3. **Validation**: Monitor actual vs. predicted performance
-4. **Feature Engineering**: The built-in solar performance metric significantly improves accuracy
+4. **Feature Engineering**: Built-in temporal and seasonal features improve model accuracy
 5. **Outlier Review**: Check removed outliers to identify potential system issues
 
 ## Troubleshooting
